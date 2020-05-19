@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http:www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/css/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/lib/highlight/styles/vs2015.css">
+    <title>帆软数据源</title>
+    <style rel="stylesheet">
+        .el-input {
+            width: 500px;
+        }
+
+        .el-select .el-input {
+            width: 100px;
+        }
+
+        .frEntry .el-collapse-item__header {
+            font-weight: bold;
+        }
+
+        .frRelativePath {
+            margin-left: 30px;
+        }
+
+        .frDataSource {
+            margin-left: 30px;
+        }
+
+        .frDataSource .el-collapse-item__header {
+            font-family: 'Consolas', serif;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <el-backtop>
+        <i class="el-icon-caret-top"></i>
+    </el-backtop>
+
+    <el-container>
+        <el-header height="100px" style="font-size: 20px; line-height: 1.7px; text-align: center; padding: 50px;">
+            帆软数据源查询工具
+        </el-header>
+        <el-main>
+            <div style="width: 100%; text-align: center">
+                <el-form class="input-with-select" :inline="true" :model="query" @submit.native.prevent>
+                    <el-form-item>
+                        <el-input v-model="query.keywords" placeholder="请输入报表名称" clearable
+                                  @keyup.enter.native="onSubmit">
+                            <el-select v-model="subDir" slot="prepend" placeholder="根路径">
+                                <el-option label="根路径" value=""></el-option>
+                                <el-option v-for="item in subDirs" :label="item" :value="item" :key="item"></el-option>
+                            </el-select>
+                        </el-input>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" icon="el-icon-search" @click="onSubmit">查询</el-button>
+                    </el-form-item>
+                </el-form>
+            </div>
+            <div>
+                <el-collapse class="frEntry" v-model="activeNames" accordion>
+                    <el-collapse-item v-for="item in frEntryFiles" :title="item.fileName" :name="item.relativePath"
+                                      :key="item.relativePath" icon="el-icon-data-board">
+                        <div class="frRelativePath">
+                            <el-link type="primary"> {{ item.relativePath }}</el-link>
+                        </div>
+                        <el-collapse accordion class="frDataSource">
+                            <el-collapse-item v-for="data in item.dataSources"
+                                              :title="data.typeName"
+                                              :name="(item.relativePath + data.name + data.typeName)"
+                                              :key="(item.relativePath + data.name + data.typeName)"
+                                              icon="el-icon-s-data">
+                                <div class="frQueryText">
+                                    <pre>
+                                        <code class="json">{{data.queryText}}</code>
+                                    </pre>
+                                </div>
+                                <div>
+                                    列名
+                                    <ul>
+                                        <li class="frColumnName" v-for="column in data.columns"
+                                            :key="(item.relativePath + data.name + data.typeName + column.name)">
+                                            {{ column.name }}
+                                        </li>
+                                    </ul>
+                                </div>
+                            </el-collapse-item>
+                        </el-collapse>
+                    </el-collapse-item>
+                </el-collapse>
+            </div>
+        </el-main>
+    </el-container>
+</div>
+
+<base th:href="@{/}"/>
+<script src="/lib/vue/dist/vue.js"></script>
+<script src="/lib/element-ui/lib/index.js"></script>
+<script src="/lib/axios/dist/axios.min.js"></script>
+<script src="/lib/highlight/highlight.pack.js"></script>
+<script src="/lib/js-cookie/js.cookie.js"></script>
+<script src="/js/util.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/api.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+<script>
+    new Vue({
+        el: '#app',
+        data: function () {
+            return {
+                query: {
+                    keywords: ''
+                },
+                activeNames: ['1'],
+                subDir: '',
+                subDirs: [],
+                frEntryFiles: []
+            }
+        },
+        methods: {
+            onSubmit: function () {
+                let self = this;
+                Cookies.set('subDir', self.subDir, { expires: 365 });
+                api.query(self.subDir, self.query.keywords)
+                    .then(function (response) {
+                        self.frEntryFiles = response.data.data;
+                        if (self.frEntryFiles.length === 0) {
+                            self.$message({
+                                showClose: true,
+                                message: '没有数据！'
+                            })
+                        } else {
+                            self.$nextTick(function () {
+                                let blocks = document.querySelectorAll('code')
+                                blocks.forEach(function (block) {
+                                    hljs.highlightBlock(block);
+                                });
+                            })
+                        }
+                    })
+                    .catch(function (error) {
+                            self.$notify.error({
+                                title: '错误',
+                                message: error.message
+                            })
+                        }
+                    )
+            }
+        },
+
+        mounted: function () {
+            let self = this;
+            api.getSubDirs()
+                .then(function (response) {
+                    self.subDirs = response.data.data;
+                    let s = Cookies.get('subDir');
+                    if (s !== undefined)
+                        self.subDir = s;
+                })
+                .catch(function (error) {
+                    self.$notify.error({
+                        title: '错误',
+                        message: error.message
+                    })
+                })
+        }
+    })
+</script>
+</body>
+</html>
